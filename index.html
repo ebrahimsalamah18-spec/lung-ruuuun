@@ -123,10 +123,11 @@ body{overflow:hidden;}
 .menu-btn{padding:12px;font-size:14px;font-weight:bold;letter-spacing:1px;background:#3b82f6;color:#fff;border:2px solid #60a5fa;border-radius:8px;cursor:pointer;}
 
 /* MENU MASCOT */
-#menu-mascot-canvas{position:absolute;bottom:0;right:5%;z-index:1;image-rendering:pixelated;opacity:0.85;}
-.menu-speech-bubble{position:absolute;bottom:28%;right:calc(5% + 55px);z-index:3;background:#fff;color:#1e1b4b;border-radius:12px;padding:8px 12px;font-size:clamp(9px,2vw,12px);font-weight:bold;line-height:1.4;box-shadow:0 4px 0 rgba(0,0,0,0.2);max-width:140px;text-align:center;animation:bubbleFloat 3s ease-in-out infinite;}
-@keyframes bubbleFloat{0%,100%{transform:translateY(0);}50%{transform:translateY(-5px);}}
-.menu-speech-bubble::after{content:'';position:absolute;bottom:-7px;right:18px;border:5px solid transparent;border-top-color:#fff;margin-left:-5px;}
+.mascot-wrapper { position:absolute; bottom:0; right:5%; width:100px; height:150px; z-index:3; pointer-events:none; }
+#menu-mascot-canvas { width:100%; height:100%; image-rendering:pixelated; opacity:0.85; display:block; }
+.menu-speech-bubble { position:absolute; bottom:85px; right:60px; background:#fff; color:#1e1b4b; border-radius:10px; padding:6px 10px; font-size:11px; font-weight:bold; line-height:1.3; box-shadow:0 3px 0 rgba(0,0,0,0.2); text-align:center; animation:bubbleFloat 3s ease-in-out infinite; white-space:nowrap; pointer-events:none; }
+@keyframes bubbleFloat { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-5px);} }
+.menu-speech-bubble::after { content:''; position:absolute; bottom:-6px; right:15px; border:6px solid transparent; border-top-color:#fff; border-bottom:0; margin-left:-6px; }
 
 /* POPUPS */
 .popup-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:2000;display:flex;align-items:center;justify-content:center;}
@@ -170,8 +171,10 @@ body{overflow:hidden;}
     </div>
     <div class="high-score-display">HIGH SCORE: <span id="menu-high-score" style="color:#fbbf24;">00000</span></div>
   </div>
-  <canvas id="menu-mascot-canvas" width="120" height="180" style="width:100px;height:150px;"></canvas>
-  <div class="menu-speech-bubble">"When will<br>I recover?"</div>
+  <div class="mascot-wrapper">
+    <canvas id="menu-mascot-canvas" width="120" height="180"></canvas>
+    <div class="menu-speech-bubble">Help me<br>quit smoking</div>
+  </div>
   <h1 class="game-main-title">LUNG CARE<br>RUNNER</h1>
   <div class="menu-buttons">
     <button id="btn-start-game" class="huge-btn" onclick="startGameFromMenu()">▶ PLAY NOW</button>
@@ -319,13 +322,18 @@ document.addEventListener("DOMContentLoaded",()=>{
 let playerProfile = { name:"", avatarId:1 };
 let selectedAvatarId = 1;
 
-// Draw avatar previews for onboarding
+// Draw avatar previews using the exact game character function for 100% uniformity
 function drawAvatarPreview(canvasId, isFemale){
   const c = document.getElementById(canvasId);
   if(!c) return;
   const ctx = c.getContext('2d');
   ctx.clearRect(0,0,56,56);
-  drawLungCharacterSmall(ctx, 4, 4, 48, 48, isFemale, false, 0);
+  
+  // Temporarily swap the current profile gender so the renderer draws it exactly as selected
+  const originalAvatarId = playerProfile.avatarId;
+  playerProfile.avatarId = isFemale ? 2 : 1;
+  drawAnatomicalLung(ctx, 6, 6, 44, 44, 3, false, 0, 0);
+  playerProfile.avatarId = originalAvatarId;
 }
 
 window.addEventListener('load',()=>{
@@ -363,11 +371,13 @@ function savePlayerProfile(){
 function showMainMenu(){
   document.getElementById('main-menu-screen').style.display='flex';
   document.getElementById('menu-name').textContent = playerProfile.name;
-  // Draw small avatar in header
+  
+  // Draw small avatar in header identically to in-game model
   const mac = document.getElementById('menu-avatar-canvas');
   const mctx = mac.getContext('2d');
   mctx.clearRect(0,0,32,32);
-  drawLungCharacterSmall(mctx, 0, 0, 32, 32, playerProfile.avatarId===2, false, 0);
+  drawAnatomicalLung(mctx, 2, 2, 28, 28, 3, false, 0, 0);
+  
   const localHigh = localStorage.getItem('lungRunnerLocalHigh')||0;
   document.getElementById('menu-high-score').textContent = String(localHigh).padStart(5,'0');
   // Draw mascot
@@ -1018,7 +1028,7 @@ function showQuiz(){
   list.innerHTML=''; document.getElementById('quiz-feedback').textContent='';
   const qlc=document.getElementById('quiz-lung-canvas'), qctx=qlc.getContext('2d');
   let qf=0;
-  function animQL(){ qf++; qctx.clearRect(0,0,64,64); drawInjuredLungSmall(qctx,4,4,56,56,qf); quizLungAnim=requestAnimationFrame(animQL); }
+  function animQL(){ qf++; qctx.clearRect(0,0,64,64); drawAnatomicalLung(qctx,8,8,48,48,0,false,qf,0); quizLungAnim=requestAnimationFrame(animQL); }
   animQL();
   q.opts.forEach((opt,i)=>{
     const btn=document.createElement('button');
@@ -1046,7 +1056,6 @@ function answerQuiz(chosen,correct,list){
     setTimeout(()=>{
       if(quizLungAnim){ cancelAnimationFrame(quizLungAnim); quizLungAnim=null; }
       quizScreen.classList.remove('show'); 
-      // FIX THE BUG: Resume gameActive execution so the EndScreen logic triggers properly
       gameActive = true; 
       showEndScreen(false);
     },1200);
@@ -1159,122 +1168,7 @@ function renderHealthUI(){
 }
 
 // ═══════════════════════════════════════════
-//  DRAW: LUNG CHARACTER SMALL (for avatar previews)
-// ═══════════════════════════════════════════
-function drawLungCharacterSmall(context, x, y, w, h, isFemale, isTransformed, frame){
-  context.save();
-  const mainPink="#f78396", shadow="#e0536c", trach="#f59ab0";
-  const bob = frame > 0 ? Math.sin(frame*0.25)*1 : 0;
-  context.fillStyle=trach; context.fillRect(x+w*.44,y+2+bob,w*.12,h*.28);
-  context.fillStyle=mainPink;
-  context.fillRect(x+w*.08,y+h*.22+bob,w*.34,h*.65);
-  context.fillRect(x+w*.16,y+h*.16+bob,w*.26,h*.1);
-  context.fillRect(x+w*.02,y+h*.35+bob,w*.06,h*.45);
-  context.fillRect(x+w*.58,y+h*.22+bob,w*.34,h*.65);
-  context.fillRect(x+w*.58,y+h*.16+bob,w*.26,h*.1);
-  context.fillRect(x+w*.92,y+h*.35+bob,w*.06,h*.45);
-  context.fillStyle=shadow;
-  context.fillRect(x+w*.08,y+h*.82+bob,w*.26,h*.05);
-  context.fillRect(x+w*.66,y+h*.82+bob,w*.26,h*.05);
-  
-  // Eyes
-  context.fillStyle="#000";
-  context.fillRect(x+w*.24,y+h*.46+bob,w*.08,h*.08);
-  context.fillRect(x+w*.68,y+h*.46+bob,w*.08,h*.08);
-  context.fillStyle="#fff";
-  context.fillRect(x+w*.24,y+h*.46+bob,w*.03,h*.03);
-  context.fillRect(x+w*.68,y+h*.46+bob,w*.03,h*.03);
-  
-  if (isTransformed > 0) {
-      // Draw angry mouth
-      context.lineWidth = 2;
-      context.strokeStyle = "#000";
-      context.beginPath();
-      context.moveTo(x+w*0.42, y+h*0.60+bob);
-      context.lineTo(x+w*0.50, y+h*0.57+bob);
-      context.lineTo(x+w*0.58, y+h*0.60+bob);
-      context.stroke();
-  } else {
-      // Mouth — smile
-      context.fillStyle="#000";
-      context.fillRect(x+w*.44,y+h*.58+bob,w*.12,h*.04);
-      context.fillRect(x+w*.40,y+h*.54+bob,w*.04,h*.04);
-      context.fillRect(x+w*.56,y+h*.54+bob,w*.04,h*.04);
-      // Cheeks
-      context.fillStyle="#ff4e72";
-      context.fillRect(x+w*.16,y+h*.56+bob,w*.06,h*.04);
-      context.fillRect(x+w*.78,y+h*.56+bob,w*.06,h*.04);
-  }
-
-  if(isFemale){
-    if(isTransformed === 0) {
-        // Long hair
-        context.fillStyle="#8b4513";
-        context.fillRect(x+w*.06,y+h*.12+bob,w*.14,h*.55);
-        context.fillRect(x+w*.80,y+h*.12+bob,w*.14,h*.55);
-        context.fillRect(x+w*.12,y+h*.06+bob,w*.76,h*.14);
-        // Lipstick
-        context.fillStyle="#e11d48";
-        context.fillRect(x+w*.44,y+h*.60+bob,w*.12,h*.05);
-    }
-  } else {
-    if(isTransformed === 0) {
-        // Mustache
-        context.fillStyle="#3b1f0a";
-        context.fillRect(x+w*.40,y+h*.64+bob,w*.08,h*.04);
-        context.fillRect(x+w*.52,y+h*.64+bob,w*.08,h*.04);
-        context.fillRect(x+w*.36,y+h*.60+bob,w*.05,h*.04);
-        context.fillRect(x+w*.59,y+h*.60+bob,w*.05,h*.04);
-        // Short hair
-        context.fillStyle="#2d1b00";
-        context.fillRect(x+w*.14,y+h*.06+bob,w*.72,h*.10);
-        context.fillRect(x+w*.08,y+h*.10+bob,w*.12,h*.14);
-        context.fillRect(x+w*.80,y+h*.10+bob,w*.12,h*.14);
-    }
-  }
-
-  // Anime SSJ / God form spiky hair logic 
-  if(isTransformed>0){
-    const isBlue = isTransformed === 2;
-    const baseCol = isBlue ? "#0ea5e9" : "#eab308";
-    const darkCol = isBlue ? "#0284c7" : "#ca8a04";
-
-    context.fillStyle = darkCol;
-    const cx = x + w*0.5;
-    const cy = y + h*0.1 + bob;
-    
-    context.beginPath();
-    context.moveTo(cx-w*0.4, cy+h*0.2); context.lineTo(cx-w*0.6, cy-h*0.1); context.lineTo(cx-w*0.2, cy-h*0.1);
-    context.moveTo(cx+w*0.4, cy+h*0.2); context.lineTo(cx+w*0.6, cy-h*0.1); context.lineTo(cx+w*0.2, cy-h*0.1);
-    context.fill();
-
-    context.fillStyle=baseCol;
-    context.beginPath();
-    context.moveTo(cx-w*0.15, cy); context.lineTo(cx-w*0.05, cy-h*0.55); context.lineTo(cx+w*0.15, cy);
-    context.moveTo(cx-w*0.3, cy+h*0.1); context.lineTo(cx-w*0.4, cy-h*0.4); context.lineTo(cx-w*0.1, cy-h*0.1);
-    context.moveTo(cx-w*0.4, cy+h*0.2); context.lineTo(cx-w*0.7, cy-h*0.1); context.lineTo(cx-w*0.25, cy+h*0.1);
-    context.moveTo(cx+w*0.3, cy+h*0.1); context.lineTo(cx+w*0.4, cy-h*0.4); context.lineTo(cx+w*0.1, cy-h*0.1);
-    context.moveTo(cx+w*0.4, cy+h*0.2); context.lineTo(cx+w*0.7, cy-h*0.1); context.lineTo(cx+w*0.25, cy+h*0.1);
-    context.fill();
-
-    context.beginPath();
-    context.moveTo(cx-w*0.1, cy); context.lineTo(cx-w*0.15, cy+h*0.15); context.lineTo(cx, cy+h*0.05);
-    context.moveTo(cx+w*0.1, cy); context.lineTo(cx+w*0.15, cy+h*0.15); context.lineTo(cx, cy+h*0.05);
-    context.fill();
-
-    // Glow aura
-    context.shadowColor=isTransformed===2?"#06b6d4":"#fbbf24";
-    context.shadowBlur=12;
-    context.strokeStyle=isTransformed===2?"rgba(6,182,212,0.4)":"rgba(251,191,36,0.4)";
-    context.lineWidth=2;
-    context.strokeRect(x+w*.04,y+bob,w*.92,h*.95);
-    context.shadowBlur=0;
-  }
-  context.restore();
-}
-
-// ═══════════════════════════════════════════
-//  DRAW: ANATOMICAL LUNG (main gameplay)
+//  DRAW: ANATOMICAL LUNG (main gameplay & menus)
 // ═══════════════════════════════════════════
 function drawAnatomicalLung(context,x,y,w,h,curLives,isHealed,frame,transformTier){
   context.save();
@@ -1405,7 +1299,7 @@ function drawAnatomicalLung(context,x,y,w,h,curLives,isHealed,frame,transformTie
     context.fill();
   }
 
-  // Legs/arms logic seamlessly matches motion
+  // Legs/arms logic seamlessly matches motion or idle state
   context.fillStyle="#1e1e24";
   if(!isHealed&&gameActive){
     const isMidAirCrouch=lung.isJumping&&(lung.h<=lung.crouchH);
@@ -1429,26 +1323,10 @@ function drawAnatomicalLung(context,x,y,w,h,curLives,isHealed,frame,transformTie
       context.fillRect(x-5,y+h*.45+lly,5,h*.12); context.fillRect(x+w,y+h*.45+rly,5,h*.12);
     }
   } else {
+    // Stationary base arms and legs (for menu rendering and idle states)
     context.fillRect(x+w*.22,y+h*.87,w*.08,7); context.fillRect(x+w*.7,y+h*.87,w*.08,7);
     context.fillRect(x-5,y+h*.45,5,h*.12); context.fillRect(x+w,y+h*.25,5,h*.15);
   }
-  context.restore();
-}
-
-function drawInjuredLungSmall(context,x,y,w,h,frame){
-  context.save();
-  let mainPink="#6b5e5e",shadow="#4a3f3f",trach="#7a6e6e";
-  let bob=Math.sin(frame*0.2)*1.2; y+=bob;
-  context.fillStyle=trach; context.fillRect(x+w*.44,y+2,w*.12,h*.28);
-  context.fillStyle=mainPink;
-  context.fillRect(x+w*.08,y+h*.22,w*.34,h*.65); context.fillRect(x+w*.16,y+h*.16,w*.26,h*.1); context.fillRect(x+w*.02,y+h*.35,w*.06,h*.45);
-  context.fillRect(x+w*.58,y+h*.22,w*.34,h*.65); context.fillRect(x+w*.58,y+h*.16,w*.26,h*.1); context.fillRect(x+w*.92,y+h*.35,w*.06,h*.45);
-  context.fillStyle=shadow; context.fillRect(x+w*.08,y+h*.82,w*.26,h*.05); context.fillRect(x+w*.66,y+h*.82,w*.26,h*.05);
-  context.fillStyle="#f5f5dc"; context.fillRect(x+w*.1,y+h*.3,w*.3,h*.07); context.fillRect(x+w*.6,y+h*.45,w*.28,h*.07);
-  context.fillStyle="#ef4444"; context.fillRect(x+w*.2,y+h*.3,w*.1,h*.07); context.fillRect(x+w*.7,y+h*.45,w*.08,h*.07);
-  context.fillStyle="#000"; context.fillRect(x+w*.24,y+h*.46,w*.08,h*.08); context.fillRect(x+w*.68,y+h*.46,w*.08,h*.08);
-  context.fillStyle="#fff"; context.fillRect(x+w*.24,y+h*.46,w*.03,h*.03); context.fillRect(x+w*.68,y+h*.46,w*.03,h*.03);
-  context.fillStyle="#000"; context.fillRect(x+w*.44,y+h*.54,w*.12,h*.04);
   context.restore();
 }
 
